@@ -5,19 +5,19 @@ import (
 )
 
 type subscriptionRemoval struct {
-	domain       string
-	subscription int
+	vaultPathAndDomain appcontext.VaultPathAndDomain
+	subscription       int
 }
 
 type subscriptionAddition struct {
-	domain string
-	sub    chan appcontext.CertAndKey
-	resp   chan int
+	vaultPathAndDomain appcontext.VaultPathAndDomain
+	sub                chan appcontext.CertAndKey
+	resp               chan int
 }
 
 type CertManager struct {
-	knownCerts            map[string]appcontext.CertAndKey
-	subscriptions         map[string]map[int](chan appcontext.CertAndKey)
+	knownCerts            map[appcontext.VaultPathAndDomain]appcontext.CertAndKey
+	subscriptions         map[appcontext.VaultPathAndDomain]map[int](chan appcontext.CertAndKey)
 	appContext            appcontext.AppContext
 	subscriptionRemovals  chan subscriptionRemoval
 	subscriptionAdditions chan subscriptionAddition
@@ -28,8 +28,8 @@ type CertManager struct {
 func New(appContext appcontext.AppContext) appcontext.CertManager {
 	cm := &CertManager{
 		appContext:            appContext,
-		subscriptions:         make(map[string]map[int](chan appcontext.CertAndKey)),
-		knownCerts:            make(map[string]appcontext.CertAndKey),
+		subscriptions:         make(map[appcontext.VaultPathAndDomain]map[int](chan appcontext.CertAndKey)),
+		knownCerts:            make(map[appcontext.VaultPathAndDomain]appcontext.CertAndKey),
 		subscriptionRemovals:  make(chan subscriptionRemoval),
 		subscriptionAdditions: make(chan subscriptionAddition),
 		certUpdates:           make(chan certUpdate),
@@ -46,7 +46,7 @@ mainLoop:
 	for {
 		select {
 		case r := <-c.subscriptionRemovals:
-			subs, found := c.subscriptions[r.domain]
+			subs, found := c.subscriptions[r.vaultPathAndDomain]
 			if !found {
 				// TODO something is fishy, log this!
 				continue mainLoop
@@ -64,15 +64,15 @@ mainLoop:
 			delete(subs, r.subscription)
 			if len(subs) == 0 {
 				// TODO - shut down cert goroutine
-				delete(c.subscriptions, r.domain)
+				delete(c.subscriptions, r.vaultPathAndDomain)
 			}
 
 		case s := <-c.subscriptionAdditions:
-			subs, found := c.subscriptions[s.domain]
+			subs, found := c.subscriptions[s.vaultPathAndDomain]
 			if !found {
 				subs = make(map[int]chan appcontext.CertAndKey)
-				c.subscriptions[s.domain] = subs
-				go runCertAgent(s.domain, c.certUpdates, c.appContext)
+				c.subscriptions[s.vaultPathAndDomain] = subs
+				go runCertAgent(s.vaultPathAndDomain, c.certUpdates, c.appContext)
 			}
 
 			c.lastSubscriptionID++
@@ -81,13 +81,13 @@ mainLoop:
 
 			s.resp <- id
 
-			cert, certFound := c.knownCerts[s.domain]
+			cert, certFound := c.knownCerts[s.vaultPathAndDomain]
 			if certFound {
 				s.sub <- cert
 			}
 
 		case cu := <-c.certUpdates:
-			subs, found := c.subscriptions[cu.domain]
+			subs, found := c.subscriptions[cu.vaultPathAndDomain]
 			if !found {
 				c.appContext.Logger.Warn("received update without anyone subscribing")
 				continue mainLoop
@@ -98,18 +98,18 @@ mainLoop:
 				v <- cu.cert
 			}
 
-			c.knownCerts[cu.domain] = cu.cert
+			c.knownCerts[cu.vaultPathAndDomain] = cu.cert
 		}
 	}
 }
 
-func (c *CertManager) SubscribeToCertificate(domain string) (chan appcontext.CertAndKey, func()) {
-	c.appContext.Logger.With("domain", domain).Info("subscribed to certificate")
+func (c *CertManager) SubscribeToCertificate(vaultPathAndDomain appcontext.VaultPathAndDomain) (chan appcontext.CertAndKey, func()) {
+	c.appContext.Logger.With("vaultPathAndDomain", vaultPathAndDomain).Info("subscribed to certificate")
 	ch := make(chan appcontext.CertAndKey)
 	resp := make(chan int)
-	c.subscriptionAdditions <- subscriptionAddition{domain: domain, sub: ch, resp: resp}
+	c.subscriptionAdditions <- subscriptionAddition{vaultPathAndDomain: vaultPathAndDomain, sub: ch, resp: resp}
 	subID := <-resp
 	return ch, func() {
-		c.subscriptionRemovals <- subscriptionRemoval{domain: domain, subscription: subID}
+		c.subscriptionRemovals <- subscriptionRemoval{vaultPathAndDomain: vaultPathAndDomain, subscription: subID}
 	}
 }

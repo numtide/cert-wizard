@@ -41,10 +41,6 @@ func main() {
 				Name:    "vault-password",
 				EnvVars: []string{"VAULT_PASSWORD"},
 			},
-			&cli.StringFlag{
-				Name:    "vault-path",
-				EnvVars: []string{"VAULT_PATH"},
-			},
 		},
 		Action: func(c *cli.Context) error {
 			lc := zap.NewProductionConfig()
@@ -82,7 +78,6 @@ func main() {
 			appContext := appcontext.AppContext{
 				VaultClient: vc,
 				Logger:      logger,
-				CertPath:    c.String("vault-path"),
 			}
 
 			cm := certmanager.New(appContext)

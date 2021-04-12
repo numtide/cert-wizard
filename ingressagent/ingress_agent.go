@@ -23,14 +23,14 @@ func Process(input chan event.Event, appCtx appcontext.AppContext, terminate fun
 	namespace := initial.Data.Namespace
 	var secretName string
 
-	shouldProvideCert := initial.Data.ObjectMeta.Annotations["cert-wizard.numtide.com/provide-cert"] == "true"
+	vaultPath := initial.Data.ObjectMeta.Annotations["cert-wizard.numtide.com/vault-path"]
 
-	if shouldProvideCert && len(initial.Data.Spec.TLS) > 0 {
+	if vaultPath != "" && len(initial.Data.Spec.TLS) > 0 {
 		first := initial.Data.Spec.TLS[0]
 		if len(first.Hosts) > 0 {
 			domain := first.Hosts[0]
 			secretName = first.SecretName
-			certSubscription, certSubscriptionCancel = appCtx.CertManager.SubscribeToCertificate(domain)
+			certSubscription, certSubscriptionCancel = appCtx.CertManager.SubscribeToCertificate(appcontext.VaultPathAndDomain{Domain: domain, VaultPath: vaultPath})
 		}
 	}
 

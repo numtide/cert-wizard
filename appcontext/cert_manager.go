@@ -5,6 +5,11 @@ type CertAndKey struct {
 	Key  string
 }
 
+type VaultPathAndDomain struct {
+	VaultPath string
+	Domain    string
+}
+
 type CertManager interface {
-	SubscribeToCertificate(domain string) (chan CertAndKey, func())
+	SubscribeToCertificate(pathAndDomain VaultPathAndDomain) (chan CertAndKey, func())
 }

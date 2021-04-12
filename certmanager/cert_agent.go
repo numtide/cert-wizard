@@ -11,13 +11,13 @@ import (
 )
 
 type certUpdate struct {
-	domain string
-	cert   appcontext.CertAndKey
+	vaultPathAndDomain appcontext.VaultPathAndDomain
+	cert               appcontext.CertAndKey
 }
 
-func runCertAgent(domain string, updates chan certUpdate, appContext appcontext.AppContext) {
+func runCertAgent(vaultPathAndDomain appcontext.VaultPathAndDomain, updates chan certUpdate, appContext appcontext.AppContext) {
 
-	logger := appContext.Logger.With("domain", domain)
+	logger := appContext.Logger.With("pathAndDomain", vaultPathAndDomain)
 
 	logger.Info("cert agent started")
 
@@ -33,12 +33,12 @@ func runCertAgent(domain string, updates chan certUpdate, appContext appcontext.
 		var sleepDuration time.Duration
 		var err error
 
-		raw, cert, err = getCertFromVault(domain, appContext)
+		raw, cert, err = getCertFromVault(vaultPathAndDomain, appContext)
 		if err != nil {
 			logger.With("error", err).Error("while getting cert")
 			sleepDuration = noCertBackoff.NextBackOff()
 		} else {
-			updates <- certUpdate{domain: domain, cert: *raw}
+			updates <- certUpdate{vaultPathAndDomain: vaultPathAndDomain, cert: *raw}
 			noCertBackoff.Reset()
 		}
 
@@ -64,7 +64,7 @@ func runCertAgent(domain string, updates chan certUpdate, appContext appcontext.
 
 		}
 
-		appContext.Logger.With("domain", domain, "sleepDuration", sleepDuration).Info("sleeping")
+		appContext.Logger.With("vaultPathAndDomain", vaultPathAndDomain, "sleepDuration", sleepDuration).Info("sleeping")
 
 		time.Sleep(sleepDuration)
 
@@ -72,9 +72,9 @@ func runCertAgent(domain string, updates chan certUpdate, appContext appcontext.
 
 }
 
-func getCertFromVault(domain string, appContext appcontext.AppContext) (*appcontext.CertAndKey, *tls.Certificate, error) {
-	res, err := appContext.VaultClient.Logical().Write(appContext.CertPath, map[string]interface{}{
-		"common_name": domain,
+func getCertFromVault(vaultPathAndDomain appcontext.VaultPathAndDomain, appContext appcontext.AppContext) (*appcontext.CertAndKey, *tls.Certificate, error) {
+	res, err := appContext.VaultClient.Logical().Write(vaultPathAndDomain.VaultPath, map[string]interface{}{
+		"common_name": vaultPathAndDomain.Domain,
 	})
 
 	if err != nil {

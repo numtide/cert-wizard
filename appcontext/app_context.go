@@ -9,7 +9,6 @@ import (
 type AppContext struct {
 	KubeClient  *kubernetes.Clientset
 	VaultClient *api.Client
-	CertPath    string
 	Logger      *zap.SugaredLogger
 	CertManager CertManager
 }
