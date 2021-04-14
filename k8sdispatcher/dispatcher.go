@@ -40,6 +40,7 @@ eventLoop:
 				if !found {
 					continue eventLoop
 				}
+				delete(agents, key)
 				close(ag)
 				continue eventLoop
 			}
